@@ -1,4 +1,5 @@
 import { getMovieDetails, getWatchProviders } from "../../../lib/tmdb";
+import { OTT_LINKS } from "../../../lib/ottLinks";
 
 export default async function MoviePage({
   params,
@@ -9,7 +10,11 @@ export default async function MoviePage({
 
   const movie = await getMovieDetails(id);
 
-  const providers = await getWatchProviders(id);
+  const watchData = await getWatchProviders(id);
+
+  const providers = watchData.providers;
+
+  const watchLink = watchData.link;
 
   if (!movie) {
     return <div className="text-white p-10">Movie not found</div>;
@@ -37,21 +42,38 @@ export default async function MoviePage({
               Available in India on
             </h2>
 
-            {providers?.flatrate ? (
-              <div className="flex gap-4 flex-wrap">
-                {providers.flatrate.map((provider: any) => (
-                  <div
+            <div className="flex gap-4 flex-wrap mt-4">
+              {providers.map((provider: any) => {
+                console.log(provider.provider_name);
+                const link = OTT_LINKS[provider.provider_name];
+
+                return (
+                  <a
                     key={provider.provider_id}
-                    className="bg-gray-900 px-4 py-2 rounded"
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-gray-900 px-4 py-2 rounded hover:bg-gray-800 cursor-pointer"
                   >
-                    {provider.provider_name}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-400">
-                Not currently streaming on major OTT platforms in India
-              </p>
+                    <img
+                      src={`https://image.tmdb.org/t/p/w45${provider.logo_path}`}
+                      className="w-6 h-6 rounded"
+                    />
+
+                    <span>{provider.provider_name}</span>
+                  </a>
+                );
+              })}
+            </div>
+
+            {watchLink && (
+              <a
+                href={watchLink}
+                target="_blank"
+                className="inline-block mt-6 bg-red-600 hover:bg-red-700 px-6 py-3 rounded font-semibold"
+              >
+                ▶ Watch Now
+              </a>
             )}
           </div>
         </div>

@@ -32,7 +32,12 @@ export async function getWatchProviders(id: string) {
 
   const data = await res.json();
 
-  return data.results?.IN || null;
+  const indiaData = data.results?.IN;
+
+  return {
+    providers: indiaData?.flatrate || [],
+    link: indiaData?.link || null,
+  };
 }
 
 export async function getLatestStreamingMovies(): Promise<any[]> {
