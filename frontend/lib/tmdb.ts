@@ -35,17 +35,16 @@ export async function getWatchProviders(id: string) {
   return data.results?.IN || null;
 }
 
-export async function getLatestStreamingMovies(): Promise<Movie[]> {
+export async function getLatestStreamingMovies(): Promise<any[]> {
   const res = await fetch(
     `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&with_origin_country=IN&sort_by=release_date.desc&vote_count.gte=20`,
     { cache: "no-store" },
   );
 
   const data = await res.json();
-
   const movies = data.results.slice(0, 20);
 
-  const streamingMovies: Movie[] = [];
+  const streamingMovies = [];
 
   for (const movie of movies) {
     const providerRes = await fetch(
@@ -54,8 +53,13 @@ export async function getLatestStreamingMovies(): Promise<Movie[]> {
 
     const providerData = await providerRes.json();
 
-    if (providerData.results?.IN?.flatrate) {
-      streamingMovies.push(movie);
+    const providers = providerData.results?.IN?.flatrate;
+
+    if (providers) {
+      streamingMovies.push({
+        ...movie,
+        providers,
+      });
     }
   }
 

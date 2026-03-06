@@ -12,7 +12,7 @@ export default async function Home() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         {movies.map((movie) => (
-          <MovieCard key={movie.id} movie={movie} />
+          <MovieCard key={movie.id} movie={movie} providers={movie.providers} />
         ))}
       </div>
     </main>
