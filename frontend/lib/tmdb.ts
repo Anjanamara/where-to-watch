@@ -1,11 +1,17 @@
 import { Movie } from "../types/movie";
+import pLimit from "p-limit";
 
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const REVALIDATE_TIME = 900; // 15 minutes
+
+export type StreamingMovie = Movie & {
+  providers: any[];
+};
 
 export async function getTrendingMovies(): Promise<Movie[]> {
   const res = await fetch(
     `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&region=IN&sort_by=popularity.desc`,
-    { cache: "no-store" },
+    { next: { revalidate: REVALIDATE_TIME } }
   );
 
   const data = await res.json();
@@ -16,57 +22,74 @@ export async function getTrendingMovies(): Promise<Movie[]> {
 export async function getMovieDetails(id: string) {
   const res = await fetch(
     `https://api.themoviedb.org/3/movie/${id}?api_key=${API_KEY}`,
-    { cache: "no-store" },
+    { cache: "no-store" }
   );
 
   return res.json();
 }
 
 export async function getWatchProviders(id: string) {
-  const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-
   const res = await fetch(
     `https://api.themoviedb.org/3/movie/${id}/watch/providers?api_key=${API_KEY}`,
-    { cache: "no-store" },
+    { next: { revalidate: REVALIDATE_TIME } }
   );
 
   const data = await res.json();
-
   const indiaData = data.results?.IN;
 
   return {
     providers: indiaData?.flatrate || [],
-    link: indiaData?.link || null,
+    link: indiaData?.link || null
   };
 }
 
-export async function getLatestStreamingMovies(): Promise<any[]> {
-  const res = await fetch(
-    `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&with_origin_country=IN&sort_by=release_date.desc&vote_count.gte=20`,
-    { cache: "no-store" },
-  );
+export async function getLatestStreamingMovies(
+  page: number = 1
+): Promise<StreamingMovie[]> {
 
-  const data = await res.json();
-  const movies = data.results.slice(0, 20);
-
-  const streamingMovies = [];
-
-  for (const movie of movies) {
-    const providerRes = await fetch(
-      `https://api.themoviedb.org/3/movie/${movie.id}/watch/providers?api_key=${API_KEY}`,
-    );
-
-    const providerData = await providerRes.json();
-
-    const providers = providerData.results?.IN?.flatrate;
-
-    if (providers) {
-      streamingMovies.push({
-        ...movie,
-        providers,
-      });
-    }
+  if (!API_KEY) {
+    throw new Error("TMDB API key missing");
   }
 
-  return streamingMovies;
+  const limit = pLimit(5);
+  let collectedMovies: StreamingMovie[] = [];
+  let currentPage = page;
+
+  while (collectedMovies.length < 12) {
+
+    const res = await fetch(
+      `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&with_origin_country=IN&sort_by=release_date.desc&page=${currentPage}`,
+      { next: { revalidate: REVALIDATE_TIME } }
+    );
+
+    const data = await res.json();
+    const movies: Movie[] = data.results;
+
+    const providerRequests = movies.map(movie =>
+      limit(() =>
+        fetch(
+          `https://api.themoviedb.org/3/movie/${movie.id}/watch/providers?api_key=${API_KEY}`
+        ).then(r => r.json())
+      )
+    );
+
+    const providerResults = await Promise.all(providerRequests);
+
+    movies.forEach((movie, index) => {
+      const providers = providerResults[index]?.results?.IN?.flatrate;
+
+      if (providers) {
+        collectedMovies.push({
+          ...movie,
+          providers
+        });
+      }
+    });
+
+    currentPage++;
+
+    if (!data.results.length) break;
+  }
+
+  return collectedMovies;
 }
